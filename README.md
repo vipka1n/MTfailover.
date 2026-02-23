@@ -20,6 +20,63 @@
 
 ## Установка
 
+### 0. Установка WireGuard на чистый сервер
+
+На "голом" сервере (fresh Linux) могут отсутствовать необходимые компоненты. Установите их:
+
+```bash
+# Установка ядра WireGuard и утилит управления
+apt install wireguard
+
+# Установка пакета для работы с DNS (без него WireGuard не пропишет DNS из конфига)
+apt install resolvconf
+```
+
+#### Настройка конфигурации WireGuard
+
+Создайте файл конфигурации:
+
+```bash
+sudo nano /etc/wireguard/wg0.conf
+```
+
+**Пример конфига:**
+
+```ini
+[Interface]
+# Приватный ключ клиента (сгенерируйте: wg genkey)
+PrivateKey = ВАШ_PRIVATE_KEY
+# Внутренний IP в туннеле
+Address = 172.16.6.3/24
+# DNS серверы (будут работать через туннель)
+DNS = 1.1.1.1, 8.8.8.8
+
+[Peer]
+# Публичный ключ сервера
+PublicKey = ВАШ_PUBLIC_KEY_SERVER
+# Внешний IP сервера (замените на реальный)
+Endpoint = 91.108.56.100:51820
+# Весь трафик через туннель
+AllowedIPs = 0.0.0.0/0
+# Сохранять соединение (keep-alive)
+PersistentKeepalive = 25
+```
+
+**Запуск WireGuard:**
+
+```bash
+# Запуск интерфейса
+sudo wg-quick up wg0
+
+# Проверка статуса
+sudo wg show
+
+# Автозапуск при загрузке (опционально)
+sudo systemctl enable wg-quick@wg0
+```
+
+> **Примечание:** В этом проекте используется имя интерфейса `one`. Если вы используете `wg0`, измените соответствующие настройки в `chain.conf` и systemd-службе.
+
 ### 1. Создание директорий
 
 ```bash
@@ -60,8 +117,8 @@ sudo nano /etc/systemd/system/net-failover.service
 ```ini
 [Unit]
 Description=Network Failover Service
-After=network.target wg-quick@one.service
-Requires=wg-quick@one.service
+After=network.target wg-quick@wg0.service
+Requires=wg-quick@wg0.service
 
 [Service]
 Type=simple
@@ -85,6 +142,8 @@ SyslogIdentifier=net-failover
 [Install]
 WantedBy=multi-user.target
 ```
+
+> **Важно:** В этом примере используется интерфейс `wg0`. Если вы используете имя `one` (или другое), замените `wg-quick@wg0.service` на `wg-quick@one.service` в строках `After=` и `Requires=`.
 
 ### 5. Запуск и проверка службы
 
